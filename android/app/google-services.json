@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "325344634473",
+    "project_id": "nombramientosoj",
+    "storage_bucket": "nombramientosoj.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:325344634473:android:4ca81c9af5aae3fed0e4f8",
+        "android_client_info": {
+          "package_name": "com.example.nombramientos_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB19oR3Yjy8w54gsiXKrN9wH5vBVmh7Bes"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
