@@ -31,6 +31,9 @@ class _ComisionFormState extends State<ComisionForm> {
   // Firestore reference
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
+  // Loading state
+  bool _isLoading = false;
+  
   @override
   void dispose() {
     _nombreController.dispose();
@@ -95,6 +98,97 @@ class _ComisionFormState extends State<ComisionForm> {
       setState(() {
         controller.text = DateFormat('dd/MM/yyyy').format(picked);
       });
+    }
+  }
+  
+  // Save form data to Firestore
+  Future<void> _saveFormData() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Parse dates
+      DateTime? fechaInicio;
+      DateTime? fechaFin;
+      
+      try {
+        if (_fechaInicioController.text.isNotEmpty) {
+          fechaInicio = DateFormat('dd/MM/yyyy').parse(_fechaInicioController.text);
+        }
+        
+        if (_fechaFinController.text.isNotEmpty) {
+          fechaFin = DateFormat('dd/MM/yyyy').parse(_fechaFinController.text);
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error en formato de fecha: $e')),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      // Prepare data
+      final comisionData = {
+        'nombre': _nombreController.text,
+        'cargo': _cargoController.text,
+        'sueldo_mensual': _sueldoController.text,
+        'nit': _nitController.text,
+        'dependencia': _dependenciaController.text,
+        'fechaInicio': fechaInicio != null ? Timestamp.fromDate(fechaInicio) : null,
+        'fechaFin': fechaFin != null ? Timestamp.fromDate(fechaFin) : null,
+        'motivo': _motivoController.text,
+        'tipoTransporte': _tipoTransporte,
+        'placas': _tipoTransporte == 'Vehículo de la Institución' ? _placasController.text : '',
+        'firmante': _firmante,
+        'fecha_registro': Timestamp.now(),
+      };
+      
+      // Save to Firestore in 'comisiones' collection
+      await _firestore.collection('comisiones').add(comisionData);
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Comisión guardada correctamente')),
+        );
+        
+        // Clear form
+        _formKey.currentState!.reset();
+        _nombreController.clear();
+        _cargoController.clear();
+        _sueldoController.clear();
+        _nitController.clear();
+        _dependenciaController.clear();
+        _fechaInicioController.clear();
+        _fechaFinController.clear();
+        _motivoController.clear();
+        _placasController.clear();
+        setState(() {
+          _tipoTransporte = 'Vehículo de la Institución';
+          _firmante = 'Coordinador II';
+        });
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: $e')),
+        );
+      }
+    } finally {
+      // Reset loading state
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -482,40 +576,44 @@ class _ComisionFormState extends State<ComisionForm> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 ElevatedButton(
-                                  onPressed: () {
-                                    if (_formKey.currentState!.validate()) {
-                                      // Procesar el formulario
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Procesando datos')),
-                                      );
-                                    }
-                                  },
+                                  onPressed: _isLoading ? null : _saveFormData,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.blue[900],
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                   ),
-                                  child: const Text('Guardar'),
+                                  child: _isLoading 
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Guardar'),
                                 ),
                                 const SizedBox(width: 16),
                                 OutlinedButton(
-                                  onPressed: () {
-                                    // Limpiar el formulario
-                                    _formKey.currentState!.reset();
-                                    _nombreController.clear();
-                                    _cargoController.clear();
-                                    _sueldoController.clear();
-                                    _nitController.clear();
-                                    _dependenciaController.clear();
-                                    _fechaInicioController.clear();
-                                    _fechaFinController.clear();
-                                    _motivoController.clear();
-                                    _placasController.clear();
-                                    setState(() {
-                                      _tipoTransporte = 'Vehículo de la Institución';
-                                      _firmante = 'Jefe VI';
-                                    });
-                                  },
+                                  onPressed: _isLoading 
+                                    ? null 
+                                    : () {
+                                        // Limpiar el formulario
+                                        _formKey.currentState!.reset();
+                                        _nombreController.clear();
+                                        _cargoController.clear();
+                                        _sueldoController.clear();
+                                        _nitController.clear();
+                                        _dependenciaController.clear();
+                                        _fechaInicioController.clear();
+                                        _fechaFinController.clear();
+                                        _motivoController.clear();
+                                        _placasController.clear();
+                                        setState(() {
+                                          _tipoTransporte = 'Vehículo de la Institución';
+                                          _firmante = 'Coordinador II';
+                                        });
+                                      },
                                   style: OutlinedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                   ),
