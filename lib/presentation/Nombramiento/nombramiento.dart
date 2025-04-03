@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Importar esto
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'pdf_generator.dart';
 
 class ComisionForm extends StatefulWidget {
   const ComisionForm({super.key});
@@ -33,6 +35,13 @@ class _ComisionFormState extends State<ComisionForm> {
   
   // Loading state
   bool _isLoading = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Inicializar datos de localización para español
+    initializeDateFormatting('es', null);
+  }
   
   @override
   void dispose() {
@@ -93,7 +102,7 @@ class _ComisionFormState extends State<ComisionForm> {
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
-      builder: (BuildContext context, Widget? child) {
+      builder: (context, child) {
         return Theme(
           data: ThemeData.light().copyWith(
             primaryColor: Colors.blue[900],
@@ -112,7 +121,35 @@ class _ComisionFormState extends State<ComisionForm> {
     }
   }
   
-  // Save form data to Firestore
+  // Obtener el siguiente número de nombramiento
+  Future<String> _getNextNombramientoNumber() async {
+    final now = DateTime.now();
+    final year = now.year.toString();
+    
+    // Referencia al documento contador para el año actual
+    final counterRef = _firestore.collection('contadores').doc('nombramientos_$year');
+    
+    // Ejecutar una transacción para garantizar la consistencia
+    return _firestore.runTransaction<String>((transaction) async {
+      // Obtener el documento actual
+      final counterDoc = await transaction.get(counterRef);
+      
+      int currentCount = 1; // Valor predeterminado si no existe
+      
+      // Si el documento existe, incrementar el contador
+      if (counterDoc.exists) {
+        currentCount = (counterDoc.data()?['count'] ?? 0) + 1;
+      }
+      
+      // Actualizar el contador en Firestore
+      transaction.set(counterRef, {'count': currentCount}, SetOptions(merge: true));
+      
+      // Formatear el número de nombramiento (por ejemplo: 01-2025)
+      return '${currentCount.toString().padLeft(2, '0')}-$year';
+    });
+  }
+  
+  // Save form data to Firestore and generate PDF
   Future<void> _saveFormData() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -145,8 +182,12 @@ class _ComisionFormState extends State<ComisionForm> {
         return;
       }
       
+      // Obtener el número de nombramiento
+      final numeroNombramiento = await _getNextNombramientoNumber();
+      
       // Prepare data
       final comisionData = {
+        'numero_nombramiento': numeroNombramiento,
         'nombre': _nombreController.text,
         'cargo': _cargoController.text,
         'sueldo_mensual': _sueldoController.text,
@@ -161,13 +202,29 @@ class _ComisionFormState extends State<ComisionForm> {
         'fecha_registro': Timestamp.now(),
       };
       
-      // Save to Firestore in 'comisiones' collection
-      await _firestore.collection('comisiones').add(comisionData);
+      // Save to Firestore in 'nombramientos' collection (nueva colección)
+      final docRef = await _firestore.collection('nombramientos').add(comisionData);
+      
+      // Generar PDF
+      await NombramientoPdfGenerator.printNombramiento(
+        numeroNombramiento: numeroNombramiento,
+        nombre: _nombreController.text,
+        cargo: _cargoController.text,
+        sueldo: _sueldoController.text,
+        nit: _nitController.text,
+        dependencia: _dependenciaController.text,
+        fechaInicio: fechaInicio,
+        fechaFin: fechaFin,
+        motivo: _motivoController.text,
+        tipoTransporte: _tipoTransporte,
+        placas: _placasController.text,
+        firmante: _firmante,
+      );
       
       // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Comisión guardada correctamente')),
+          SnackBar(content: Text('Nombramiento #$numeroNombramiento guardado correctamente')),
         );
         
         // Clear form
@@ -207,9 +264,52 @@ class _ComisionFormState extends State<ComisionForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Formulario de Comisión', style: TextStyle(fontWeight: FontWeight.bold),),
+        title: const Text('Formulario de Nombramiento', style: TextStyle(fontWeight: FontWeight.bold),),
         centerTitle: true,
         foregroundColor: Colors.black54,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _isLoading ? null : () async {
+              if (_formKey.currentState!.validate()) {
+                try {
+                  // Parse dates
+                  DateTime? fechaInicio;
+                  DateTime? fechaFin;
+                  
+                  if (_fechaInicioController.text.isNotEmpty) {
+                    fechaInicio = DateFormat('dd/MM/yyyy').parse(_fechaInicioController.text);
+                  }
+                  
+                  if (_fechaFinController.text.isNotEmpty) {
+                    fechaFin = DateFormat('dd/MM/yyyy').parse(_fechaFinController.text);
+                  }
+                  
+                  // Vista previa del PDF sin guardar en Firestore
+                  await NombramientoPdfGenerator.printNombramiento(
+                    numeroNombramiento: "XX-${DateTime.now().year}",
+                    nombre: _nombreController.text,
+                    cargo: _cargoController.text,
+                    sueldo: _sueldoController.text,
+                    nit: _nitController.text,
+                    dependencia: _dependenciaController.text,
+                    fechaInicio: fechaInicio,
+                    fechaFin: fechaFin,
+                    motivo: _motivoController.text,
+                    tipoTransporte: _tipoTransporte,
+                    placas: _placasController.text,
+                    firmante: _firmante,
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error al generar PDF: $e')),
+                  );
+                }
+              }
+            },
+            tooltip: 'Vista previa PDF',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -602,7 +702,7 @@ class _ComisionFormState extends State<ComisionForm> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Text('Guardar'),
+                                    : const Text('Guardar y Generar PDF'),
                                 ),
                                 const SizedBox(width: 16),
                                 OutlinedButton(
