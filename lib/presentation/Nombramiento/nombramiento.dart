@@ -93,6 +93,17 @@ class _ComisionFormState extends State<ComisionForm> {
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: Colors.blue[900],
+            hintColor: Colors.blue[900],
+            colorScheme: ColorScheme.light(primary: Colors.blue[900]!),
+            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
