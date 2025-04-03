@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nombramientos_app/presentation/Nombramiento/comisiones_list_screen.dart';
 import 'package:nombramientos_app/presentation/Nombramiento/nombramiento.dart';
 import 'package:nombramientos_app/presentation/Users/add_user.dart';
 import 'package:nombramientos_app/presentation/Users/list_user.dart';
@@ -63,6 +64,13 @@ class _HomePageState extends State<HomePage> {
               title: const Text('Crear Nombramiento'),
               onTap: () {
                 _setScreen(const ComisionForm());
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.list_alt),
+              title: const Text('Comisiones'),
+              onTap: () {
+                _setScreen(const ComisionesListScreen());
               },
             ),
             ListTile(
