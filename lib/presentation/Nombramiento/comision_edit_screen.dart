@@ -23,6 +23,7 @@ class _ComisionEditScreenState extends State<ComisionEditScreen> {
   // Form controllers
   late TextEditingController _nombreController;
   late TextEditingController _cargoController;
+  late TextEditingController _renglonController;
   late TextEditingController _sueldoController;
   late TextEditingController _nitController;
   late TextEditingController _dependenciaController;
@@ -161,6 +162,7 @@ class _ComisionEditScreenState extends State<ComisionEditScreen> {
         numeroNombramiento: numeroNombramiento,
         nombre: _nombreController.text,
         cargo: _cargoController.text,
+        renglon: _renglonController.text,
         sueldo: _sueldoController.text,
         nit: _nitController.text,
         dependencia: _dependenciaController.text,

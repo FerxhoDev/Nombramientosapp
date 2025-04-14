@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart'; // Importar esto
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'dart:html' as html;
 
 class NombramientoPdfGenerator {
   // Método principal para generar el PDF
@@ -12,6 +14,7 @@ class NombramientoPdfGenerator {
     required String numeroNombramiento,
     required String nombre,
     required String cargo,
+    required String renglon,
     required String sueldo,
     required String nit,
     required String dependencia,
@@ -22,21 +25,26 @@ class NombramientoPdfGenerator {
     required String placas,
     required String firmante,
   }) async {
-    // Inicializar datos de localización para español
-    await initializeDateFormatting('es', null);
+    // Cargar la fuente Arvo como solicitaste
+    final font = await PdfGoogleFonts.arvoRegular();
+    final fontBold = await PdfGoogleFonts.arvoBold();
+    final fontItalic = await PdfGoogleFonts.arvoItalic();
     
-    // Cargar la fuente Times New Roman (o una fuente similar)
-    final font = await PdfGoogleFonts.afacadRegular();
-    final fontBold = await PdfGoogleFonts.afacadBold();
-    final fontItalic = await PdfGoogleFonts.afacadItalic();
-    
-    // Cargar el logo
+    // Cargar el logo con el nombre correcto
     final ByteData logoData = await rootBundle.load('assets/OJ.png');
     final Uint8List logoBytes = logoData.buffer.asUint8List();
     final pw.MemoryImage logoImage = pw.MemoryImage(logoBytes);
 
     // Crear el documento PDF
     final pdf = pw.Document();
+
+    // Inicializar datos de localización para español
+    try {
+      await initializeDateFormatting('es', null);
+    } catch (e) {
+      // Si ya está inicializado o hay un error, continuamos
+      print('Nota: Locale ya inicializado o error: $e');
+    }
 
     // Formatear fechas
     final fechaInicioStr = fechaInicio != null 
@@ -47,7 +55,14 @@ class NombramientoPdfGenerator {
         : '';
     
     // Fecha actual para el pie del documento
-    final fechaActual = DateFormat('dd \'de\' MMMM \'de\' yyyy', 'es').format(DateTime.now());
+    String fechaActual;
+    try {
+      fechaActual = DateFormat('dd \'de\' MMMM \'de\' yyyy', 'es').format(DateTime.now());
+    } catch (e) {
+      // Si hay un error con el formato en español, usar formato simple
+      fechaActual = DateFormat('dd/MM/yyyy').format(DateTime.now());
+      print('Error al formatear fecha en español: $e');
+    }
     
     // Determinar qué checkbox marcar
     bool vehiculoInstitucion = tipoTransporte == 'Vehículo de la Institución';
@@ -160,7 +175,7 @@ class NombramientoPdfGenerator {
                               ),
                               pw.SizedBox(height: 5),
                               pw.Text(
-                                'Unidad Regional de Informatica y Telecomunicaciones',
+                                dependencia,
                                 textAlign: pw.TextAlign.center,
                                 style: pw.TextStyle(
                                   font: fontItalic,
@@ -304,7 +319,7 @@ class NombramientoPdfGenerator {
                         padding: const pw.EdgeInsets.all(5),
                         height: 40,
                         child: pw.Text(
-                          cargo,
+                          cargo + renglon,
                           style: pw.TextStyle(
                             font: font,
                             fontSize: 10,
@@ -369,7 +384,7 @@ class NombramientoPdfGenerator {
                 ),
                 padding: const pw.EdgeInsets.only(bottom: 2),
                 child: pw.Text(
-                  motivo,
+                  dependencia,
                   style: pw.TextStyle(
                     font: fontItalic,
                     fontSize: 10,
@@ -595,9 +610,9 @@ class NombramientoPdfGenerator {
                     ),
                     pw.SizedBox(height: 5),
                     pw.Text(
-                      firmante == 'Jefe VI'
-                      ? "(f). Ing. Josué Roberto Velásquez Dionicio"
-                      : "(f). Ing. Julio Roberto Galicia Aldana",
+                      firmante == "Coordinador II"
+                      ? "(f). Ing. Julio Roberto Galicia Aldana"
+                      : "(f). M.A Josue Roberto Velasquez Dionicio",
                       style: pw.TextStyle(
                         font: fontBold,
                         fontSize: 11,
@@ -687,6 +702,7 @@ class NombramientoPdfGenerator {
     required String numeroNombramiento,
     required String nombre,
     required String cargo,
+    required String renglon,
     required String sueldo,
     required String nit,
     required String dependencia,
@@ -697,31 +713,45 @@ class NombramientoPdfGenerator {
     required String placas,
     required String firmante,
   }) async {
-    final pdfBytes = await generateNombramientoPdf(
-      numeroNombramiento: numeroNombramiento,
-      nombre: nombre,
-      cargo: cargo,
-      sueldo: sueldo,
-      nit: nit,
-      dependencia: dependencia,
-      fechaInicio: fechaInicio,
-      fechaFin: fechaFin,
-      motivo: motivo,
-      tipoTransporte: tipoTransporte,
-      placas: placas,
-      firmante: firmante,
-    );
-    
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdfBytes,
-    );
+    try {
+      final pdfBytes = await generateNombramientoPdf(
+        numeroNombramiento: numeroNombramiento,
+        nombre: nombre,
+        cargo: cargo,
+        renglon: renglon,
+        sueldo: sueldo,
+        nit: nit,
+        dependencia: dependencia,
+        fechaInicio: fechaInicio,
+        fechaFin: fechaFin,
+        motivo: motivo,
+        tipoTransporte: tipoTransporte,
+        placas: placas,
+        firmante: firmante,
+      );
+      
+      if (kIsWeb) {
+        // Solución específica para web
+        _downloadPdfInWeb(pdfBytes, 'nombramiento_$numeroNombramiento.pdf');
+      } else {
+        // Para plataformas móviles
+        await Printing.layoutPdf(
+          onLayout: (_) async => pdfBytes,
+          name: 'nombramiento_$numeroNombramiento.pdf',
+        );
+      }
+    } catch (e) {
+      print('Error al generar o imprimir PDF: $e');
+      rethrow;
+    }
   }
   
-  // Método para guardar el PDF
+  // Método para guardar el PDF (optimizado para web)
   static Future<void> saveNombramiento({
     required String numeroNombramiento,
     required String nombre,
     required String cargo,
+    required String renglon,
     required String sueldo,
     required String nit,
     required String dependencia,
@@ -732,25 +762,61 @@ class NombramientoPdfGenerator {
     required String placas,
     required String firmante,
   }) async {
-    final pdfBytes = await generateNombramientoPdf(
-      numeroNombramiento: numeroNombramiento,
-      nombre: nombre,
-      cargo: cargo,
-      sueldo: sueldo,
-      nit: nit,
-      dependencia: dependencia,
-      fechaInicio: fechaInicio,
-      fechaFin: fechaFin,
-      motivo: motivo,
-      tipoTransporte: tipoTransporte,
-      placas: placas,
-      firmante: firmante,
-    );
+    try {
+      final pdfBytes = await generateNombramientoPdf(
+        numeroNombramiento: numeroNombramiento,
+        nombre: nombre,
+        cargo: cargo,
+        renglon: renglon,
+        sueldo: sueldo,
+        nit: nit,
+        dependencia: dependencia,
+        fechaInicio: fechaInicio,
+        fechaFin: fechaFin,
+        motivo: motivo,
+        tipoTransporte: tipoTransporte,
+        placas: placas,
+        firmante: firmante,
+      );
+      
+      if (kIsWeb) {
+        // Solución específica para web
+        _downloadPdfInWeb(pdfBytes, 'nombramiento_$numeroNombramiento.pdf');
+      } else {
+        // Para plataformas móviles
+        await Printing.sharePdf(
+          bytes: pdfBytes,
+          filename: 'nombramiento_$numeroNombramiento.pdf',
+        );
+      }
+    } catch (e) {
+      print('Error al guardar PDF: $e');
+      rethrow;
+    }
+  }
+  
+  // Método específico para descargar PDF en web
+  static void _downloadPdfInWeb(Uint8List bytes, String fileName) {
+    // Crear un blob con los bytes del PDF
+    final blob = html.Blob([bytes], 'application/pdf');
     
-    await Printing.sharePdf(
-      bytes: pdfBytes,
-      filename: 'nombramiento_$numeroNombramiento.pdf',
-    );
+    // Crear una URL para el blob
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    
+    // Crear un elemento <a> para la descarga
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', fileName)
+      ..style.display = 'none';
+    
+    // Añadir el elemento al DOM
+    html.document.body?.children.add(anchor);
+    
+    // Simular un clic para iniciar la descarga
+    anchor.click();
+    
+    // Limpiar
+    html.document.body?.children.remove(anchor);
+    html.Url.revokeObjectUrl(url);
   }
 }
 

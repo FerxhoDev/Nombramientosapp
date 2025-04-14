@@ -101,6 +101,7 @@ class _ComisionesListScreenState extends State<ComisionesListScreen> {
         numeroNombramiento: data['numero_nombramiento'] ?? '',
         nombre: data['nombre'] ?? '',
         cargo: data['cargo'] ?? '',
+        renglon: data['renglon'] ?? '',
         sueldo: data['sueldo_mensual'] ?? '',
         nit: data['nit'] ?? '',
         dependencia: data['dependencia'] ?? '',

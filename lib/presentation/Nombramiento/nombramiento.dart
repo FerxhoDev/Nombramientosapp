@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart'; // Importar esto
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'pdf_generator.dart';
@@ -14,10 +14,11 @@ class ComisionForm extends StatefulWidget {
 
 class _ComisionFormState extends State<ComisionForm> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form controllers
   final _nombreController = TextEditingController();
   final _cargoController = TextEditingController();
+  final _renglon = TextEditingController();
   final _sueldoController = TextEditingController();
   final _nitController = TextEditingController();
   final _dependenciaController = TextEditingController();
@@ -25,28 +26,29 @@ class _ComisionFormState extends State<ComisionForm> {
   final _fechaFinController = TextEditingController();
   final _motivoController = TextEditingController();
   final _placasController = TextEditingController();
-  
+
   // Form values
   String _tipoTransporte = 'Vehículo de la Institución';
   String _firmante = 'Coordinador II';
-  
+
   // Firestore reference
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // Loading state
   bool _isLoading = false;
-  
+
   @override
   void initState() {
     super.initState();
     // Inicializar datos de localización para español
     initializeDateFormatting('es', null);
   }
-  
+
   @override
   void dispose() {
     _nombreController.dispose();
     _cargoController.dispose();
+    _renglon.dispose();
     _sueldoController.dispose();
     _nitController.dispose();
     _dependenciaController.dispose();
@@ -70,7 +72,7 @@ class _ComisionFormState extends State<ComisionForm> {
     
     return snapshot.docs.map((doc) => doc['nombre'] as String).toList();
   }
-  
+
   // Fetch employee data from Firestore by name
   Future<void> _fetchEmployeeData(String name) async {
     try {
@@ -83,7 +85,7 @@ class _ComisionFormState extends State<ComisionForm> {
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data();
         setState(() {
-          _cargoController.text = data['cargo'] ?? '';
+          _cargoController.text = data['cargo'] + data['renglon'] ?? '';
           _nitController.text = data['nit'] ?? '';
           _sueldoController.text = data['sueldo_mensual']?.toString() ?? '';
           // You can add more fields as needed
@@ -102,17 +104,6 @@ class _ComisionFormState extends State<ComisionForm> {
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.light().copyWith(
-            primaryColor: Colors.blue[900],
-            hintColor: Colors.blue[900],
-            colorScheme: ColorScheme.light(primary: Colors.blue[900]!),
-            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) {
       setState(() {
@@ -120,7 +111,7 @@ class _ComisionFormState extends State<ComisionForm> {
       });
     }
   }
-  
+
   // Obtener el siguiente número de nombramiento
   Future<String> _getNextNombramientoNumber() async {
     final now = DateTime.now();
@@ -148,7 +139,7 @@ class _ComisionFormState extends State<ComisionForm> {
       return '${currentCount.toString().padLeft(2, '0')}-$year';
     });
   }
-  
+
   // Save form data to Firestore and generate PDF
   Future<void> _saveFormData() async {
     if (!_formKey.currentState!.validate()) {
@@ -190,6 +181,7 @@ class _ComisionFormState extends State<ComisionForm> {
         'numero_nombramiento': numeroNombramiento,
         'nombre': _nombreController.text,
         'cargo': _cargoController.text,
+        'renglon': _renglon.text,
         'sueldo_mensual': _sueldoController.text,
         'nit': _nitController.text,
         'dependencia': _dependenciaController.text,
@@ -210,6 +202,7 @@ class _ComisionFormState extends State<ComisionForm> {
         numeroNombramiento: numeroNombramiento,
         nombre: _nombreController.text,
         cargo: _cargoController.text,
+        renglon: _renglon.text,
         sueldo: _sueldoController.text,
         nit: _nitController.text,
         dependencia: _dependenciaController.text,
@@ -290,6 +283,7 @@ class _ComisionFormState extends State<ComisionForm> {
                     numeroNombramiento: "XX-${DateTime.now().year}",
                     nombre: _nombreController.text,
                     cargo: _cargoController.text,
+                    renglon: _renglon.text,
                     sueldo: _sueldoController.text,
                     nit: _nitController.text,
                     dependencia: _dependenciaController.text,
@@ -369,7 +363,7 @@ class _ComisionFormState extends State<ComisionForm> {
                                 ),
                                 const SizedBox(height: 16),
                                 TextFormField(
-                                  controller: _cargoController,
+                                  controller: _cargoController ,
                                   decoration: const InputDecoration(
                                     labelText: 'Cargo y Reglón',
                                     border: OutlineInputBorder(),
